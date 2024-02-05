@@ -1,7 +1,7 @@
 (ns first-leipzig.song
   (:require [overtone.live :refer :all]
             [overtone.sc.machinery.server.connection :as conn]
-            [leipzig.melody :refer :all]
+            [leipzig.melody :as melody]
             [leipzig.scale :as scale]
             [leipzig.live :as live]
             [leipzig.chord :as chord]
@@ -25,24 +25,30 @@
 ; Composition
 (def progression [0 4, 3 0 4 0 ])
 
-(defn bassline [root]
-  (->> (phrase (cycle [1 1/2 1/2 1 1]) [0 -3 -1 0 2 0 2 3 2 0])
-       (where :pitch (scale/from root))
-       (where :pitch (comp scale/lower scale/lower))
-       (all :part :bass)))
+(def aea [{:root 0
+           :g-clef j}])
+
+;(defn bassline [{:root root {:shape shape :duration duration} }]
+;  (->> (melody/phrase (cycle [1 1/2 1/2 1 1]) [0 -3 -1 0 2 0 2 3 2 0])
+;       (melody/where :pitch (scale/from root))
+;       (melody/where :pitch (comp scale/lower scale/lower))
+;       (melody/all :part :bass)))
+(defn bassline [{root :root {shape :shape duration :duration} :f-clef }]
+  (println-str root " " shape " " duration)
+)
 
 (defn accompaniment [root]
   (->>
-    (phrase [8] [(-> chord/seventh (chord/root root))])
-    (all :part :accompaniment)))
+    (melody/phrase [8] [(-> chord/seventh (chord/root root))])
+    (melody/all :part :accompaniment)))
 
 ; Track
 (def track
   (->>
-    (mapthen bassline progression)
-    (with (mapthen accompaniment progression))
-    (where :pitch (comp temperament/equal scale/A scale/minor))
-    (tempo (bpm 90))))
+    (melody/mapthen bassline progression)
+    (melody/with (melody/mapthen accompaniment progression))
+    (melody/where :pitch (comp temperament/equal scale/A scale/minor))
+    (melody/tempo (melody/bpm 90))))
 
 (defn -main []
   (live/play track))
@@ -58,13 +64,38 @@
 ;(chord/inversion chord/triad)
 
 ;(all :part :bass (bassline 0))
-(def fifth-and-octave
-  {:i 0, :v 4, :xii 11})
-
+(def fifth-and-octave {:i 0, :v 4, :xii 11})
+(def third-and-octave {:i 0, :iii 3, :xii 11})
+(def fifth-and-second  {:i 4, :ii 1})
+(def root {:i 0})
 (def second-inversion (chord/inversion chord/triad 2) )
 (def first-inversion (chord/inversion chord/triad 1) )
-(where :pitch (comp scale/A scale/major) first-inversion)
+(def second-inversion-augmented-fourth (-> (chord/inversion chord/triad 1) (chord/augment :iii 1)) )
+;(melody/where :pitch (comp melody/utter scale/A scale/major ) (melody/utter first-inversion))
 
+(def an-ending [
+     {:root 0 :g-clef {:shape second-inversion                  :quavers 2} :f-clef {:shape fifth-and-octave :quavers 2} }
+     {:root 4 :g-clef {:shape fifth-and-octave                  :quavers 2} :f-clef {:shape chord/triad      :quavers 2} }
+     {:root 0 :g-clef {:shape :rest                             :quavers 2} :f-clef {:shape :rest            :quavers 2}}
+     {:root 3 :g-clef {:shape first-inversion                   :quavers 2} :f-clef {:shape fifth-and-octave :quavers 2} }
+     {:root 0 :g-clef {:shape second-inversion                  :quavers 2} :f-clef {:shape fifth-and-octave :quavers 2} }
+     {:root 4 :g-clef {:shape chord/triad                       :quavers 2} :f-clef {:shape chord/triad      :quavers 2} }
+     {:root 0 :g-clef {:shape :rest                             :quavers 2} :f-clef {:shape :rest            :quavers 2}}
+     {:root 3 :g-clef {:shape fifth-and-octave                  :quavers 2} :f-clef {:shape second-inversion :quavers 2} }
+     {:root 0 :g-clef {:shape second-inversion                  :quavers 2} :f-clef {:shape fifth-and-octave :quavers 2} }
+     {:root 4 :g-clef {:shape fifth-and-octave                  :quavers 2} :f-clef {:shape chord/triad      :quavers 2} }
+     {:root 0 :g-clef {:shape :rest                             :quavers 2} :f-clef {:shape :rest            :quavers 2}}
+     {:root 3 :g-clef {:shape second-inversion-augmented-fourth :quavers 2} :f-clef {:shape fifth-and-octave :quavers 2} }
+     {:root 0 :g-clef {:shape third-and-octave                  :quavers 2} :f-clef {:shape fifth-and-octave :quavers 2} }
+     {:root 4 :g-clef {:shape fifth-and-second                  :quavers 1} :f-clef {:shape chord/triad      :quavers 2} }
+     {:root 4 :g-clef {:shape root                              :quavers 1} :f-clef {:shape :rest            :quavers 1} }
+     ])
+
+(defn bassline [{root :root {shape :shape duration :quavers} :f-clef }]
+  (println-str "root: " root " shape: " shape " duration: " duration)
+)
+(bassline (first an-ending))
+(println an-ending)
 
 (bassline 0)
 (defn bassclef [root]
