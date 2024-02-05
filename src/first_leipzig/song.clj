@@ -23,7 +23,7 @@
 (defmethod live/play-note :accompaniment [{hertz :pitch seconds :duration}] (organ hertz seconds))
 
 ; Composition
-(def progression [0 0 3 0 4 0])
+(def progression [0 4, 3 0 4 0 ])
 
 (defn bassline [root]
   (->> (phrase (cycle [1 1/2 1/2 1 1]) [0 -3 -1 0 2 0 2 3 2 0])
@@ -61,13 +61,25 @@
 (def fifth-and-octave
   {:i 0, :v 4, :xii 11})
 
+(def second-inversion (chord/inversion chord/triad 2) )
+(def first-inversion (chord/inversion chord/triad 1) )
+(where :pitch (comp scale/A scale/major) first-inversion)
+
+
+(bassline 0)
+(defn bassclef [root]
+  (->> (where :pitch scale/lower (phrase (cycle [2]) [fifth-and-octave chord/triad]) )
+       (where :pitch (scale/from root))
+       (where :pitch (comp scale/lower scale/lower))
+       (all :part :bass)))
+
 ;
 (take 10 (->> 
-           (phrase [8] [[fifth-and-octave (chord/inversion chord/triad 2)]])
-         ;(all :part :accompainiment )
-         ;(where :pitch (comp temperament/equal scale/A scale/minor))
-         ;(tempo (bpm 90)) 
-         ;(live/play)
+           (phrase [4] [[fifth-and-octave  ]])
+           (all :part :accompaniment)
+           (where :pitch (comp temperament/equal scale/A scale/major) [{:pitch 60}])
+           (tempo (bpm 90)) 
+           ;(live/play)
          )
       )
 
