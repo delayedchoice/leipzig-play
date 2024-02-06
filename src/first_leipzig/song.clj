@@ -1,6 +1,16 @@
 (ns first-leipzig.song
   (:require [overtone.live :refer :all]
             [overtone.sc.machinery.server.connection :as conn]
+            [overtone.sc.ugens :as u]
+            [overtone.sc.server :as srv]
+            [overtone.sc.synth :as sy]
+            [overtone.sc.cgens.oscillators :as osc]
+            [overtone.sc.envelope :as envel]
+            [overtone.repl.ugens :as ru]
+            ;[overtone.algo.scaling :as scale]
+            [overtone.core]
+            [overtone.sc.cgens.mix :as mix]
+            [overtone.sc.cgens.line :as line][overtone.repl.ugens :as ru]
             [leipzig.melody :as melody]
             [leipzig.scale :as scale]
             [leipzig.live :as live]
@@ -8,69 +18,56 @@
             [leipzig.temperament :as temperament]))
 
 ; Instruments
-(definst bass [freq 110 volume 1.0]
-  (-> (saw freq)
-      (* (env-gen (perc 0.1 0.4) :action FREE))
-      (* volume)))
-
 (definst organ [freq 440 dur 1 volume 1.0]
-  (-> (square freq)
-      (* (env-gen (adsr 0.01 0.8 0.1) (line:kr 1 0 dur) :action FREE))
+  (-> (osc/square freq)
+      (* (u/env-gen (envel/adsr 0.01 0.8 0.1) (u/line:kr 1 0 dur) :action u/FREE))
       (* 1/10 volume)))
 
+(comment 
+  (meta #'overtone.core/square)
+  (ru/odoc u/lf-saw)
+ )
+
+
+(definst cs80lead
+  [freq 880
+   amp 0.5
+   att 0.75
+   decay 0.5
+   sus 0.8
+   rel 1.0
+   fatt 0.75
+   fdecay 0.5
+   fsus 0.8
+   frel 1.0
+   cutoff 200
+   dtune 0.002
+   vibrate 4
+   vibdepth 0.015
+   gate 1
+   ratio 1
+   cbus 1
+   freq-lag 0.1]
+  (let [freq (u/lag freq freq-lag)
+        cuttoff (u/in:kr cbus)
+        env     (u/env-gen (envel/adsr att decay sus rel) gate :action u/FREE)
+        fenv    (u/env-gen (envel/adsr fatt fdecay fsus frel 2) gate)
+
+        vib     (+ 1 (u/lin-lin:kr (u/sin-osc:kr vibrate) -1 1 (- vibdepth) vibdepth))
+
+        freq    (* freq vib)
+        sig     (mix/mix (* env amp (u/saw [freq (* freq (+ dtune 1))])))]
+    sig))
 ; Arrangement
-(defmethod live/play-note :bass [{hertz :pitch}] (bass hertz))
-(defmethod live/play-note :accompaniment [{hertz :pitch seconds :duration}] (organ hertz seconds))
+(defmethod live/play-note :arrangement [{hertz :pitch seconds :duration}] (organ hertz seconds))
 
-; Composition
-(def progression [0 4, 3 0 4 0 ])
-
-(def aea [{:root 0
-           :g-clef j}])
-
-;(defn bassline [{:root root {:shape shape :duration duration} }]
-;  (->> (melody/phrase (cycle [1 1/2 1/2 1 1]) [0 -3 -1 0 2 0 2 3 2 0])
-;       (melody/where :pitch (scale/from root))
-;       (melody/where :pitch (comp scale/lower scale/lower))
-;       (melody/all :part :bass)))
-(defn bassline [{root :root {shape :shape duration :duration} :f-clef }]
-  (println-str root " " shape " " duration)
-)
-
-(defn accompaniment [root]
-  (->>
-    (melody/phrase [8] [(-> chord/seventh (chord/root root))])
-    (melody/all :part :accompaniment)))
-
-; Track
-(def track
-  (->>
-    (melody/mapthen bassline progression)
-    (melody/with (melody/mapthen accompaniment progression))
-    (melody/where :pitch (comp temperament/equal scale/A scale/minor))
-    (melody/tempo (melody/bpm 90))))
-
-(defn -main []
-  (live/play track))
-
-(comment
-  ; Loop the track, allowing live editing.
-  (live/jam (var track))
-)
-(comment
-  ; Loop the track, allowing live editing.
-  (live/stop)
-)
-;(chord/inversion chord/triad)
-
-;(all :part :bass (bassline 0))
 (def fifth-and-octave {:i 0, :v 4, :xii 11})
-(def third-and-octave {:i 0, :iii 3, :xii 11})
+(def third-and-octave {:i 0, :iii 2, :xii 11})
 (def fifth-and-second  {:i 4, :ii 1})
 (def root {:i 0})
 (def second-inversion (chord/inversion chord/triad 2) )
 (def first-inversion (chord/inversion chord/triad 1) )
-(def second-inversion-augmented-fourth (-> (chord/inversion chord/triad 1) (chord/augment :iii 1)) )
+(def second-inversion-augmented-fourth (-> second-inversion (chord/augment :iii 1)) )
 ;(melody/where :pitch (comp melody/utter scale/A scale/major ) (melody/utter first-inversion))
 
 (def an-ending [
@@ -91,30 +88,49 @@
      {:root 4 :g-clef {:shape root                              :quavers 1} :f-clef {:shape :rest            :quavers 1} }
      ])
 
-(defn bassline [{root :root {shape :shape duration :quavers} :f-clef }]
-  (println-str "root: " root " shape: " shape " duration: " duration)
+(defn translate [thing]
+  (let [
+        {
+         root :root 
+         {f-shape :shape f-duration :quavers} :f-clef 
+         {g-shape :shape g-duration :quavers} :g-clef
+         
+         } thing 
+        ] 
+    (let [f-notes (->> (melody/phrase [f-duration] [f-shape])
+                      (melody/where :pitch (scale/from root) )
+                      (melody/where :pitch (comp scale/lower scale/lower))
+                      (melody/all :part :arrangement))
+
+                 g-notes (->> (melody/phrase [f-duration] [g-shape])
+                              (melody/where :pitch (scale/from root) )
+                              (melody/all :part :arrangement))]
+     (melody/with f-notes g-notes)
+     )))
+
+(def track
+  (->>
+    (melody/mapthen translate an-ending)
+    (melody/where :pitch (comp temperament/equal scale/A scale/major))
+    (melody/tempo (melody/bpm 60))))
+
+(defn -main []
+  (live/play track))
+
+(comment
+  ; Loop the track, allowing live editing.
+  (live/jam (var track))
 )
-(bassline (first an-ending))
-(println an-ending)
 
-(bassline 0)
-(defn bassclef [root]
-  (->> (where :pitch scale/lower (phrase (cycle [2]) [fifth-and-octave chord/triad]) )
-       (where :pitch (scale/from root))
-       (where :pitch (comp scale/lower scale/lower))
-       (all :part :bass)))
+(comment
+  ; Loop the track, allowing live editing.
+  (live/stop)
+)
 
-;
-(take 10 (->> 
-           (phrase [4] [[fifth-and-octave  ]])
-           (all :part :accompaniment)
-           (where :pitch (comp temperament/equal scale/A scale/major) [{:pitch 60}])
-           (tempo (bpm 90)) 
-           ;(live/play)
-         )
-      )
+(defn reset-server-connection []
+ (conn/shutdown-server)
+ (conn/connect "127.0.0.1" 57110)
+)
 
 (comment 
-  (conn/shutdown-server)
-  (conn/conect "127.0.0.1" 57110)
-  k)
+  (conn/shutdown-server))
