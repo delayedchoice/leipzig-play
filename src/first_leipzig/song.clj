@@ -10,7 +10,7 @@
             ;[overtone.algo.scaling :as scale]
             [overtone.core]
             [overtone.sc.cgens.mix :as mix]
-            [overtone.sc.cgens.line :as line][overtone.repl.ugens :as ru]
+            [overtone.sc.cgens.line :as line]
             [leipzig.melody :as melody]
             [leipzig.scale :as scale]
             [leipzig.live :as live]
@@ -24,13 +24,14 @@
       (* 1/10 volume)))
 
 (comment 
-  (meta #'overtone.core/square)
+  (meta #'overtone.core/lin-lin)
   (ru/odoc u/lf-saw)
  )
 
 
 (definst cs80lead
   [freq 880
+   dur 1
    amp 0.5
    att 0.75
    decay 0.5
@@ -50,16 +51,17 @@
    freq-lag 0.1]
   (let [freq (u/lag freq freq-lag)
         cuttoff (u/in:kr cbus)
-        env     (u/env-gen (envel/adsr att decay sus rel) gate :action u/FREE)
+        env     (u/env-gen (envel/adsr att decay sus rel) (u/line:kr 1 0 dur) :action u/FREE)
         fenv    (u/env-gen (envel/adsr fatt fdecay fsus frel 2) gate)
 
-        vib     (+ 1 (u/lin-lin:kr (u/sin-osc:kr vibrate) -1 1 (- vibdepth) vibdepth))
+        vib     (+ 1 (line/lin-lin:kr (u/sin-osc:kr vibrate) -1 1 (- vibdepth) vibdepth))
 
         freq    (* freq vib)
         sig     (mix/mix (* env amp (u/saw [freq (* freq (+ dtune 1))])))]
     sig))
 ; Arrangement
-(defmethod live/play-note :arrangement [{hertz :pitch seconds :duration}] (organ hertz seconds))
+;(defmethod live/play-note :arrangement [{hertz :pitch seconds :duration}] (organ hertz seconds))
+(defmethod live/play-note :arrangement [{hertz :pitch seconds :duration}] (cs80lead hertz seconds))
 
 (def fifth-and-octave {:i 0, :v 4, :xii 11})
 (def third-and-octave {:i 0, :iii 2, :xii 11})
