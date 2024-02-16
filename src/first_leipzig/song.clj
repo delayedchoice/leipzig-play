@@ -1,7 +1,7 @@
 (ns first-leipzig.song
   {:clj-kondo/config '{:linters {:unresolved-symbol {:level :off}
                                  :invalid-arity {:level :off}}}}
-  (:require [overtone.live :refer :all]
+  (:require ;[overtone.live :as live]
             [overtone.sc.machinery.server.connection :as conn]
             [overtone.sc.ugens :as u]
             [overtone.sc.server :as srv]
@@ -27,7 +27,7 @@
       (* 1/10 volume)))
 
 (comment 
-  (meta #'overtone.core/definst)
+  (meta #'overtone.core/signal->wavetable)
   (ru/odoc mix/mix)
  )
 
@@ -61,9 +61,47 @@
         freq    (* freq vib)
         sig     (* env amp (u/saw [freq (* freq (+ dtune 1))]))]
     sig))
+
+(def major-third    (float 81/64))
+(def perfect-fifth  (float 3/2))
+(def major-sixth    (float 27/16))
+
+
+(inst/definst mysynth [
+                       freq 220
+                       sines 5
+                       speed 2
+                       att 0.95
+                       decay 1 
+                       sus 0.8
+                       rel 0.01 
+                       ]
+  (let [sig (* (mix/mix
+             (concat (map #(u/pan2 (* (* 0.1 (u/sin-osc (* % freq))) 
+                                      (u/lf-noise1:kr speed))
+                                   (- (clojure.core/rand 2) 1))
+                          (range 5))
+                     (map #(u/pan2 
+                             (* (* 0.05 (u/sin-osc (* % (* 2 freq major-sixth))))
+                                (u/lf-noise1:kr speed) )
+                             (- (clojure.core/rand 2) 1))
+                          (range 5))
+                     (map #(u/pan2 
+                             (* (* 0.05 (u/sin-osc (* % (* 2 freq major-third))))
+                                (u/lf-noise1:kr speed) )
+                             (- (clojure.core/rand 2) 1))
+                          (range 5))
+                     (map #(u/pan2 
+                             (* (* 0.05 (u/sin-osc (* % (* 2 freq perfect-fifth))))
+                                (u/lf-noise1:kr speed) )
+                             (- (clojure.core/rand 2) 1))
+                          (range 5))))
+           (/ 1 (*  5 )))]
+    (* 20 sig (u/env-gen (envel/adsr att decay sus rel) (u/line:kr 1 0 2) :action u/FREE))))
+
 ; Arrangement
 ;(defmethod live/play-note :arrangement [{hertz :pitch seconds :duration}] (organ hertz seconds))
-(defmethod live/play-note :arrangement [{hertz :pitch }] (cs80lead hertz 1))
+(defmethod live/play-note :arrangement [{hertz :pitch }] (mysynth hertz ))
 
 (def fifth-and-octave {:i 0, :v 4, :xii 11})
 (def fifth-and-octave-lower {:i -11, :v -7 , :xii 0})
@@ -75,9 +113,20 @@
 (def second-inversion-augmented-fourth (-> second-inversion (chord/augment :iii 1)) )
 
 (def fourth-and-sixth {:iv 3, :vi 12 }) ;c
+(def octave-sixth {:vi 12 }) ;c
+(def octave-third {:iii 9 }) ;g
 (def first-and-octave-third {:i 0, :iii 9 }) ;g
 (def fifth-and-octave-d {:v 4, :v2 11 }) ;d
+(def octave-fifth {:v 11 }) ;d
 (def fourth-and-octave-c {:iv 3, :iv2 10 }) ;c
+(def octave-fourth {:iv 10 }) ;c
+(def octave-second  {:ii 8})
+(def octave-seventh  {:xiii 13})
+(def two-octave-first  {:xiv 14})
+(def first {:i 0})
+(def third {:iii 2 })
+(def second {:ii 1 })
+(def first {:ii 0 })
 (def seventh {:vii 6})
 (def fourth-and-seventh {:iv 3, :vii 13 }) ;c -diminished
 (def first-and-octave {:vi 1, :vii 14 }) ;g
@@ -87,14 +136,30 @@
 
 ;(melody/where :pitch (comp melody/utter scale/A scale/major ) (melody/utter first-inversion))
 (def an-ending-stops [
-     {:root 0  :f-clef {:shape fourth-and-sixth :quavers 2} }
-     {:root 0  :f-clef {:shape first-and-octave-third :quavers 2} }
-     {:root 0  :f-clef {:shape fifth-and-octave-d      :quavers 2} }
+     {:root 0  :f-clef {:shape octave-sixth :quavers 2} }
+     {:root 0  :f-clef {:shape octave-third :quavers 2} }
+     {:root 0  :f-clef {:shape octave-fifth :quavers 2} }
      {:root 0  :f-clef {:shape nil            :quavers 2}}
-     {:root 0  :f-clef {:shape fourth-and-octave-c :quavers 2} }
-     {:root 0  :f-clef {:shape first-and-octave-third :quavers 2} }
-     {:root 0  :f-clef {:shape fifth-and-second      :quavers 2} }
+     {:root 0  :f-clef {:shape octave-fourth :quavers 2} }
+     {:root 0  :f-clef {:shape octave-third :quavers 2} }
+     {:root 0  :f-clef {:shape octave-second      :quavers 2} }
      {:root 0  :f-clef {:shape nil            :quavers 2}}
+     {:root 0  :f-clef {:shape octave-sixth :quavers 2} }
+     {:root 0  :f-clef {:shape octave-third :quavers 2} }
+     {:root 0  :f-clef {:shape octave-fifth :quavers 2} }
+     {:root 0  :f-clef {:shape octave-seventh      :quavers 2}}
+     {:root 0  :f-clef {:shape two-octave-first      :quavers 2}}
+     {:root 0  :f-clef {:shape octave-seventh      :quavers 1}}
+     {:root 0  :f-clef {:shape octave-sixth            :quavers 1}}
+     {:root 0  :f-clef {:shape octave-fifth            :quavers 4}}
+     ;{:root 0  :f-clef {:shape nil            :quavers 4}}
+     ;{:root 0  :f-clef {:shape third            :quavers 1}}
+     ;{:root 0  :f-clef {:shape second            :quavers 3}}
+     ;{:root 0  :f-clef {:shape first            :quavers 4}}
+     ;{:root 0  :f-clef {:shape nil            :quavers 2}}
+     ;{:root 0  :f-clef {:shape first            :quavers 1}}
+     ;{:root 0  :f-clef {:shape second            :quavers 1}}
+
 ;     {:root 3  :f-clef {:shape second-inversion :quavers 2} }
 ;     {:root 0  :f-clef {:shape fifth-and-octave :quavers 2} }
 ;     {:root 4  :f-clef {:shape chord/triad      :quavers 2} }
@@ -151,7 +216,7 @@
   (->>
     (melody/mapthen translate an-ending-stops)
     (melody/where :pitch (comp temperament/equal scale/A scale/major))
-    (melody/tempo (melody/bpm 40))))
+    (melody/tempo (melody/bpm 60))))
 
 (defn -main []
   (live/play track))
