@@ -3,7 +3,7 @@
                                  :invalid-arity {:level :off}}}}
   (:require [oz.core :as oz]
             [clojure.java.shell :as shell]
-            [clojure.java.io :as io])
+            [clojure.string :as str])
   (:import   [java.io BufferedReader StringReader]))
 
 (defn plot [data]
@@ -20,8 +20,33 @@
 (comment
   (plot [1 2 3 4 5]))
 
-(def ps (line-seq (BufferedReader.  (StringReader. (:out (shell/sh "ps" "-ef"))))))
+(defn run [cmd args] 
+  (let [output-as-lines-of-strings  (-> (shell/sh cmd args)
+                                        :out
+                                        StringReader.
+                                        BufferedReader.
+                                        line-seq )
 
+       output-as-fields (map #(str/split %1 #"\s+") output-as-lines-of-strings)
+        ]
+    output-as-fields))
+
+(defn end-process [pid]
+  (shell/sh "kill" "-9" pid))
+
+(defn get-processes-by-name [name]
+  (let [procs (run "ps" "-ef")] 
+    (filter #(str/includes? (last %1) name) procs)))
+
+;(defn end-processes-by-name)
+
+(def processes (run "ps" "-ef"))
+
+;(filter #(str/includes? (last %1) "System") processes)
 (count ps)
 (println (last ps))
-
+#_(str/split (-> (shell/sh "ps" "-ef")
+     :out
+     StringReader.
+     BufferedReader.
+     line-seq ))
